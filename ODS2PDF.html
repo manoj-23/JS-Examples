@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ODS to PDF (Separate Page for Each Row)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.0/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <input type="file" id="upload" accept=".ods"/>
+    <button onclick="generatePDF()">Generate PDF</button>
+
+    <script>
+        // Global variables to hold the ODS data and header
+        let odsData = [];
+        let header = [];
+
+        // Function to read the ODS file
+        document.getElementById('upload').addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    odsData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                    header = odsData[0]; // First row is the header
+                    console.log("ODS Data Loaded", odsData);
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        });
+
+        // Function to generate the PDF
+        function generatePDF() {
+            if (odsData.length === 0) {
+                alert('Please upload a valid ODS file first.');
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            let y = 20;
+
+            // Loop through each row (record) and create a new page for each row
+            for (let i = 1; i < odsData.length; i++) {  // Starting from 1 to skip the header
+                if (i > 1) {
+                    doc.addPage();  // Add a new page after the first row
+                }
+
+                // Transpose the current record (row) with the header
+                const rowData = odsData[i];
+                const transposedData = header.map((header, index) => {
+                    return { header: header, value: rowData[index] };
+                });
+
+                // Print the header on every new page
+                doc.setFont("helvetica", "bold");
+                doc.text("Record " + i, 20, y);
+                y += 10;
+
+                // Print the transposed data (header and values)
+                doc.setFont("helvetica", "normal");
+                transposedData.forEach((entry, index) => {
+                    doc.text(entry.header + ": " + entry.value, 20, y);
+                    y += 10; // Space after each entry
+                });
+
+                y = 20; // Reset Y position for the next record
+            }
+
+            // Save the PDF to file
+            doc.save("ods_to_pdf_separate_pages.pdf");
+        }
+    </script>
+</body>
+</html>
